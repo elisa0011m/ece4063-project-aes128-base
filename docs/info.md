@@ -8,12 +8,10 @@ You can also include images in this folder and reference them in the markdown. E
 -->
 
 ## How it works
-
-Explain how your project works
+"Loads 128-bit key and plaintext over 16 byte-serial cycles each, then performs AES-128 encryption iteratively (one round per clock). Ciphertext is read back byte-serially after done asserts."
 
 ## How to test
-
-Explain how to use your project
+"Load key via load_key + data_in for 16 cycles MSB-first. Load plaintext via load_pt + data_in for 16 cycles. Pulse start. Wait for done. Read 16 ciphertext bytes via data_out, advancing with out_shift."
 
 ## External hardware
 
