@@ -152,7 +152,6 @@ module tt_um_elisa0011m_aes_top (
             done_r <= 1'b0;
 
             case (state_fsm)
-
                 S_IDLE: begin
                     busy_r <= 1'b0;
                     if (start) begin
@@ -199,7 +198,7 @@ module tt_um_elisa0011m_aes_top (
         end else begin
             if (done_r) begin
                 out_idx    <= 4'd1;
-                data_out_r <= round_state_out[127:120];
+                data_out_r <= state[127:120];
             end else if (out_shift) begin
                 out_idx    <= out_idx + 4'd1;
                 data_out_r <= (state >> (120 - 8*out_idx)) & 8'hFF;
