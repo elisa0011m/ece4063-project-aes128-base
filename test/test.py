@@ -25,7 +25,7 @@ async def read_128(dut) -> int:
 
     # First byte already on data_out after done, no shift needed
     await FallingEdge(dut.clk)
-    result = dut.uo_out.value.integer
+    result = dut.uo_out.value.to_unsigned()
     result <<= 8 * 15
 
     for b in range(1, 16):
@@ -36,7 +36,7 @@ async def read_128(dut) -> int:
         await FallingEdge(dut.clk)
         dut.uio_in.value = 0b00000000   # deassert
 
-        byte_val = dut.uo_out.value.integer
+        byte_val = dut.uo_out.value.to_unsigned()
         result |= (byte_val << (8 * (15 - b)))
 
     return result
@@ -64,7 +64,7 @@ async def run_vector(dut, idx: int, pt: int, key: int, expected_ct: int,
     while timeout < 100:
         await RisingEdge(dut.clk)
         timeout += 1
-        if (dut.uio_out.value.integer >> 5) & 1:
+        if (dut.uio_out.value.to_unsigned() >> 5) & 1:
             done = True
             break
 
@@ -119,7 +119,7 @@ def load_vectors(filepath: str) -> list[int]:
 async def test_aes128(dut):
 
     # Start clock - 100 MHz, 10 ns period
-    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
 
     # Load test vectors
     # tb_dir = os.path.dirname(__file__)

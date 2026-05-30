@@ -1,56 +1,33 @@
 /*
-aes_top.v - AES-128 Encryption Core (TinyTapeout top level)
+tt_um_elisa0011m_aes_top.v - AES-128 (TinyTapeout, on-the-fly key schedule)
 
-    Architecture: Iterative, one round per clock cycle
-    Interface   : TinyTapeout standard port map with byte-serial
-                  load/unload for plaintext, key, and ciphertext
+    Key schedule change: replaces key_expansion (1407-bit precomputed bus)
+    with key_schedule (128-bit on-the-fly derivation, one round key per cycle).
+    All ports and serial protocol unchanged.
 
-    Pin mapping:
-        ui_in[7:0]  - data_in    : byte to shift in (key or plaintext)
-        uio_in[0]   - load_key   : pulse high each cycle to shift a key byte
-        uio_in[1]   - load_pt    : pulse high each cycle to shift a plaintext byte
-        uio_in[2]   - start      : high for one cycle to begin encryption
-        uio_in[3]   - out_shift  : pulse high to advance to next output byte
-        uio_oe      - 8'hF0      : lower nibble input, upper nibble output
-        uio_out[4]  - busy       : high while encryption is in progress
-        uio_out[5]  - done       : high for one cycle when ciphertext is valid
-        uo_out[7:0] - data_out   : current ciphertext output byte (MSB-first)
-
-    Serial protocol:
-        1. Pulse load_key=1 for 16 cycles, presenting key bytes MSB-first
-        2. Pulse load_pt=1  for 16 cycles, presenting plaintext bytes MSB-first
-        3. Pulse start=1 for one cycle to begin encryption
-        4. Wait for done=1, then pulse out_shift=1 for 15 cycles to read
-           remaining ciphertext bytes (first byte is valid on the done cycle)
-
-    Timing (encryption, unchanged):
-        Cycle 0    : start=1, load plaintext and key
-        Cycle 1    : Initial AddRoundKey (RK0)
-        Cycles 2-10: Main rounds 1-9
-        Cycle 11   : Final round 10 (no MixColumns)
-        Cycle 12   : done=1, ciphertext valid
-
-    Total encryption latency: 12 clock cycles after start
+    Internal key timing:
+        S_IDLE  + start : state    <= pt_reg ^ key_reg  (AddRoundKey, RK0)
+                          crk      <= key_reg            (seed for RK1)
+                          round_num <= 1
+        S_ROUND cycle N : next_key  = key_schedule(crk, round_num)  [comb]
+                          aes_round uses next_key as round_key
+                          crk      <= next_key
+                          round_num <= round_num + 1
 
     Andrea Lee Mei Jin      34367047
     Elisa Naily Mohd Yazid  33590745
-
 */
 `timescale 1ns/1ps
 module tt_um_elisa0011m_aes_top (
-    input  wire [7:0] ui_in,    // data_in[7:0]
-    output wire [7:0] uo_out,   // data_out[7:0]
-    input  wire [7:0] uio_in,   // [0]=load_key [1]=load_pt [2]=start [3]=out_shift
-    output wire [7:0] uio_out,  // [4]=busy [5]=done
-    output wire [7:0] uio_oe,   // [3:0]=0 (input), [7:4]=1 (output)
+    input  wire [7:0] ui_in,
+    output wire [7:0] uo_out,
+    input  wire [7:0] uio_in,
+    output wire [7:0] uio_out,
+    output wire [7:0] uio_oe,
     input  wire       ena,
     input  wire       clk,
     input  wire       rst_n
 );
-
-    // ----------------------------------------------------------------
-    // Pin mapping
-    // ----------------------------------------------------------------
 
     wire [7:0] data_in   = ui_in;
     wire       load_key  = uio_in[0];
@@ -62,16 +39,11 @@ module tt_um_elisa0011m_aes_top (
     wire       done;
     wire [7:0] data_out;
 
-    assign uo_out      = data_out;
-    assign uio_out     = {2'b00, done, busy, 4'b0000};  // [5]=done [4]=busy
-    assign uio_oe      = 8'hF0;                          // upper nibble out, lower in
+    assign uo_out  = data_out;
+    assign uio_out = {2'b00, done, busy, 4'b0000};
+    assign uio_oe  = 8'hF0;
 
-
-    // ----------------------------------------------------------------
-    // Serial input shift registers
-    // Shift in MSB-first: after 16 pulses the first byte sent is at [127:120]
-    // ----------------------------------------------------------------
-
+    // input shift register
     reg [127:0] key_reg;
     reg [127:0] pt_reg;
 
@@ -85,49 +57,30 @@ module tt_um_elisa0011m_aes_top (
         end
     end
 
+    // on-the-fly key schedule
+    reg  [127:0] current_round_key;
+    wire [127:0] next_key;
 
-    // ----------------------------------------------------------------
-    // Key schedule (driven from key_reg)
-    // ----------------------------------------------------------------
-
-    wire [1407:0] round_keys;
-    key_expansion key_exp_inst (
-        .key(key_reg),
-        .round_keys(round_keys)
+    key_schedule ks_inst (
+        .current_key (current_round_key),
+        .round_num   (round_num),
+        .next_key    (next_key)
     );
 
-
-    // Extract round key N
-    function [127:0] rk;
-        input [3:0] n;
-        begin
-            rk = round_keys[1407 - n*128 -: 128];
-        end
-    endfunction
-
-
-    // ----------------------------------------------------------------
-    // Round datapath (unchanged)
-    // ----------------------------------------------------------------
-
+    // round datapath
     reg  [127:0] state;
     reg  [3:0]   round_num;
 
-    wire [127:0] round_key_in    = rk(round_num);
     wire         is_final        = (round_num == 4'd10);
     wire [127:0] round_state_out;
 
     aes_round round_inst (
         .state_in       (state),
-        .round_key      (round_key_in),
+        .round_key      (next_key),       // was rk(round_num) from precomputed bus
         .is_final_round (is_final),
         .state_out      (round_state_out)
     );
 
-
-    // ----------------------------------------------------------------
-    // FSM (unchanged — identical to original S_IDLE/S_ROUND structure)
-    // ----------------------------------------------------------------
 
     localparam [1:0]
         S_IDLE  = 2'd0,
@@ -142,28 +95,36 @@ module tt_um_elisa0011m_aes_top (
 
     always @(posedge clk) begin
         if (!rst_n) begin
-            state_fsm <= S_IDLE;
-            busy_r    <= 1'b0;
-            done_r    <= 1'b0;
-            state     <= 128'b0;
-            round_num <= 4'd0;
+            state_fsm         <= S_IDLE;
+            busy_r            <= 1'b0;
+            done_r            <= 1'b0;
+            state             <= 128'b0;
+            round_num         <= 4'd0;
+            current_round_key <= 128'b0;
 
         end else begin
             done_r <= 1'b0;
 
             case (state_fsm)
+
                 S_IDLE: begin
                     busy_r <= 1'b0;
                     if (start) begin
-                        state     <= pt_reg ^ rk(4'd0);
-                        round_num <= 4'd1;
-                        busy_r    <= 1'b1;
-                        state_fsm <= S_ROUND;
+                        // AddRoundKey with RK0 (original key) directly
+                        state             <= pt_reg ^ key_reg;
+                        current_round_key <= key_reg;
+                        round_num         <= 4'd1;
+                        busy_r            <= 1'b1;
+                        state_fsm         <= S_ROUND;
                     end
                 end
 
                 S_ROUND: begin
-                    state <= round_state_out;
+                    // next_key (combinational) = key_schedule(current_round_key, round_num)
+                    // aes_round already consumed next_key this cycle
+                    state             <= round_state_out;
+                    current_round_key <= next_key;      // advance key for next round
+
                     if (round_num == 4'd10) begin
                         done_r    <= 1'b1;
                         busy_r    <= 1'b0;
@@ -179,13 +140,7 @@ module tt_um_elisa0011m_aes_top (
         end
     end
 
-
-    // ----------------------------------------------------------------
-    // Serial ciphertext output
-    // First byte presented on data_out the same cycle done fires.
-    // Each out_shift pulse advances by one byte (15 pulses for all 16).
-    // ----------------------------------------------------------------
-
+    // serial ciphertext output
     reg [3:0]  out_idx;
     reg [7:0]  data_out_r;
 
