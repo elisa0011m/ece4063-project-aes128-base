@@ -1,7 +1,7 @@
 # Tiny Tapeout project information
 project:
   title:        "AES-128 Hardware Accelerator"      # Project title
-  author:       "Andrea Lee, Elisa Naily"      # Your name
+  author:       "Andrea Lee Mei Jin, Elisa Naily"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "Performs AES-128 encryption on user-input plaintext and key, outputs a resulting ciphertext"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
