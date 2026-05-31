@@ -12,7 +12,7 @@ vlog -work work rtl/sbox.v
 vlog -work work rtl/sub_bytes.v
 vlog -work work rtl/shift_rows.v
 vlog -work work rtl/mix_columns.v
-vlog -work work rtl/key_expansion.v
+vlog -work work rtl/key_schedule.v
 vlog -work work rtl/aes_round.v
 vlog -work work rtl/aes_top.v
 

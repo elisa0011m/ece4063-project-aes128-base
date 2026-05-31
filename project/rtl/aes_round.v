@@ -4,8 +4,9 @@ aes_round.v - Single AES-128 round datapath
 	Performs one full AES round: SubBytes -> ShiftRows -> [MixColumns] -> AddRoundKey
 	Set a flag to skip MixColumns at round 10
 	
-	Andrea Lee Mei Jin 		34367047
-	Elisa Naily Mohd Yazid 	33590745
+	Authors:
+		Andrea Lee Mei Jin 		34367047
+		Elisa Naily Mohd Yazid 	33590745
 	
 */
 

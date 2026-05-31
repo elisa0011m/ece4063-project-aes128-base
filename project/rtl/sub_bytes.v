@@ -5,8 +5,9 @@ sub_bytes.v - AES-128 SubBytes transformation
 	Applies the S-box independently to all 16 bytes of the state
 	State is represented as a flat 128-bit bus, MSB is byte 0
 	
-	Andrea Lee Mei Jin 		34367047
-	Elisa Naily Mohd Yazid 	33590745
+	Authors:
+		Andrea Lee Mei Jin 		34367047
+		Elisa Naily Mohd Yazid 	33590745
 	
 */
 

@@ -11,8 +11,9 @@ shift_rows.v - AES-128 ShiftRows transformation
 		
 	Row i will be rotated left by i byte positions
 	
-	Andrea Lee Mei Jin 		34367047
-	Elisa Naily Mohd Yazid 	33590745
+	Authors:
+		Andrea Lee Mei Jin 		34367047
+		Elisa Naily Mohd Yazid 	33590745
 	
 */
 

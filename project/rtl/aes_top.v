@@ -1,20 +1,33 @@
 /*
 aes_top.v - AES-128 Encryption Core (top level)
 	
-	Architecture: Iterative, one round per clock cycle
-	Interface	: Start/busy/done flags handshake
+	Architecture:
+		Iterative one-cycle implementation
+		One encryption round executed per clock cycle
+		Sequential key expansion (generated each round)
+		Start/ busy/done handshake interface
+	
+	Operation:
+		1. On start, plaintext and key are loaded
+		2. Initial AddRoundKey is applied immediately
+		3. Rounds 1-9 perform SB -> SR -> MC -> ARK
+		4. Round 10 perform SB -> SR -> ARK
+		5. Ciphertext is produced and done is asserted
 	
 	Timing:
-		Cycle 0		: start=1, load the plaintext and key
-		Cycle 1		: Initial AddRoundKey (RK0)
-		Cycles 2..10: Main rounds 1-9
-		Cycle 11		: Final round 10 (no MixColumns)
-		Cycle 12		: done=1, ciphertext valid
+		Cycle 0	 	: start=1, plaintext and key loaded, initial AddRoundKey
+		Cycle 1-10	: Rounds 1-10
+		Cycle 11	 	: done=1, ciphertext valid
 		
-	Total latency: 12 clock cycles after start
+	Performance:
+		Throughput	: 1 block every 11 clock cycles
+		Latency		: 11 clock cycles from start to done
+		Key size	 	: 128 bits
+		Block size	: 128 bits
 	
-	Andrea Lee Mei Jin 		34367047
-	Elisa Naily Mohd Yazid 	33590745
+	Authors:
+		Andrea Lee Mei Jin 		34367047
+		Elisa Naily Mohd Yazid 	33590745
 	
 */
 
@@ -38,36 +51,29 @@ module aes_top (
 );
 
 
+	// Internal registers
+	reg [127:0] state;
+	reg [127:0] current_key;
+	reg [3:0] round_num;
+	
+	
 	// Key schedule
-	wire [1407:0] round_keys;
-	key_expansion key_exp_inst (
-		.key(key),
-		.round_keys(round_keys)
+	wire [127:0] next_rk;
+	key_schedule key_sched_inst (
+		.current_key(current_key),
+		.round_num(round_num),
+		.next_key(next_rk)
 	);
 	
 	
-	// Extract round key N
-	function [127:0] rk;
-		input [3:0] n;
-		begin
-			rk = round_keys[1407 - n*128 -: 128];
-		end
-	endfunction
-	
-	
-	
 	// Round datapath
-	
-	reg [127:0] state;
-	reg [3:0] round_num;
-	
-	wire [127:0] round_key_in = rk(round_num);
-	wire is_final = (round_num == 4'd10);
+	wire is_final;
+	assign is_final = (round_num == 4'd10);
 	wire [127:0] round_state_out;
 	
 	aes_round round_inst (
 		.state_in(state),
-		.round_key(round_key_in),
+		.round_key(next_rk),
 		.is_final_round(is_final),
 		.state_out(round_state_out)
 	);
@@ -90,6 +96,7 @@ module aes_top (
 			done <= 1'b0;
 			ciphertext <= 128'b0;
 			state <= 128'b0;
+			current_key <= 128'b0;
 			round_num <= 4'd0;
 			
 		end else begin
@@ -104,7 +111,8 @@ module aes_top (
 					
 					if (start) begin
 						// Apply initial AddRoundKey immediately
-						state <= plaintext ^ rk(4'd0);
+						state <= plaintext ^ key;
+						current_key <= key;
 						round_num <= 4'd1;
 						busy <= 1'b1;
 						state_fsm <= S_ROUND;
@@ -116,7 +124,7 @@ module aes_top (
 				S_ROUND: begin
 					// Apply round datapath result
 					state <= round_state_out;
-					
+					current_key <= next_rk;
 					// Final round just completed
 					if (round_num == 4'd10) begin
 						ciphertext <= round_state_out;
@@ -140,4 +148,4 @@ module aes_top (
 endmodule		
 		
  
-       
+      

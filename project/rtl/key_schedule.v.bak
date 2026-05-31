@@ -1,0 +1,113 @@
+/*
+
+key_schedule.v - AES-128 key schedule
+	
+	Generates all 11 round keys from the 128-bit cipherkey
+	Output is a flat 1408-bit bus:
+		round_keys[1407:1280] = RK0 (original key)
+		round_keys[1279:1152] = RK1
+		...
+		round_keys[127:0]		 = RK10
+		
+	Andrea Lee Mei Jin 		34367047
+	Elisa Naily Mohd Yazid 	33590745
+	
+*/
+
+module key_schedule (
+	input wire [127:0] current_key,
+	input wire [3:0] round_num,
+	output wire [127:0] next_key
+);
+
+	
+	function [31:0] rcon;
+		input [3:0] round;
+		begin
+			case (round)
+				4'd1: rcon = 32'h01000000;
+				4'd2: rcon = 32'h02000000;
+				4'd3: rcon = 32'h04000000;
+				4'd4: rcon = 32'h08000000;
+				4'd5: rcon = 32'h10000000;
+				4'd6: rcon = 32'h20000000;
+				4'd7: rcon = 32'h40000000;
+				4'd8: rcon = 32'h80000000;
+				4'd9: rcon = 32'h1b000000;
+				4'd10: rcon = 32'h36000000;
+				default: rcon = 32'h00000000;
+			endcase
+		end
+	endfunction
+	
+	
+	// RotWord
+	function [31:0] rotword;
+		input [31:0] w;
+		begin
+			rotword = {w[23:0], w[31:24]};
+		end
+	endfunction
+	
+	
+	// Expanded key words
+	wire [31:0] W [0:43];
+
+	// Initial key words
+	assign W[0] = current_key[127:96];
+   assign W[1] = current_key[95:64];
+   assign W[2] = current_key[63:32];
+   assign W[3] = current_key[31:0];
+	
+	
+	// Key expansion
+	genvar i;
+	generate
+		for (i = 1; i <= 10; i = i + 1) begin: key_sched
+		
+			// Apply RotWord to last word of previous key
+			wire [31:0] rot = rotword(W[(i - 1)*4 + 3]);
+			
+			// SubWord by instantiating 4 sbox modules on rotated words
+			wire [7:0] sw0, sw1, sw2, sw3;
+			sbox sw0_inst (.in(rot[31:24]), .out(sw0));
+			sbox sw1_inst (.in(rot[23:16]), .out(sw1));
+			sbox sw2_inst (.in(rot[15:8]), .out(sw2));
+			sbox sw3_inst (.in(rot[7:0]), .out(sw3));
+			
+			wire [31:0] subrot = {sw0, sw1, sw2, sw3};
+			
+			// W[i*4+j] = W[(i-1)*4+0] ^ SubWord(RotWord(W[(i-1)*4+3])) ^ Rcon
+			assign W[i*4 + 0] = W[(i-1)*4 + 0] ^ subrot ^ rcon(i[3:0]);
+			assign W[i*4 + 1] = W[(i-1)*4 + 1] ^ W[i*4 + 0];
+			assign W[i*4 + 2] = W[(i-1)*4 + 2] ^ W[i*4 + 1];
+			assign W[i*4 + 3] = W[(i-1)*4 + 3] ^ W[i*4 + 2];
+			
+		end
+	endgenerate
+	
+	
+	// Round key selection
+	reg [127:0] selected;
+	always @(*) begin
+		case (round_num)
+			4'd0: selected = {W[0], W[1], W[2], W[3]};
+			4'd1: selected = {W[4], W[5], W[6], W[7]};
+			4'd2: selected = {W[8], W[9], W[10], W[11]};
+			4'd3: selected = {W[12], W[13], W[14], W[15]};
+			4'd4: selected = {W[16], W[17], W[18], W[19]};
+			4'd5: selected = {W[20], W[21], W[22], W[23]};
+			4'd6: selected = {W[24], W[25], W[26], W[27]};
+			4'd7: selected = {W[28], W[29], W[30], W[31]};
+			4'd8: selected = {W[32], W[33], W[34], W[35]};
+			4'd9: selected = {W[36], W[37], W[38], W[39]};
+			4'd10: selected = {W[40], W[41], W[42], W[43]};
+			default: selected = 128'b0;
+		endcase
+	end
+	
+	assign next_key = selected;
+
+endmodule
+
+	

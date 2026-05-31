@@ -1,21 +1,9 @@
 /*
 tb_single_input.v - AES-128 testbench for user defined input
 
-	Reads plaintext, key, and expected ciphertext from .txt files
-	Runs all test vectors and reporting PASS/FAIL
-	
-	Vector sources:
-		Tests  1-21 : Fixed plaintext (all-zero), varying key
-		Tests 22-42 : Fixed key (all-zero), varying plaintext
-		Tests 43-63 : Fixed plaintext (all-zero), varying key
-		
-	Files:
-		tb/pt_vectors.txt	 - 63 x 128-bit plaintext values
-		tb/key_vectors.txt - 63 x 128-bit key values
-		tb/ct_vectors.txt	 - 63 x 128-bit ciphertext values
-	
-	Andrea Lee Mei Jin 		34367047
-	Elisa Naily Mohd Yazid 	33590745
+	Authors:
+		Andrea Lee Mei Jin 		34367047
+		Elisa Naily Mohd Yazid 	33590745
 	
 */
 
